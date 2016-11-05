@@ -19,8 +19,9 @@ defmodule Listeed.Router do
     get "/", PageController, :index
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", Listeed do
-  #   pipe_through :api
-  # end
+  scope "/api", Listeed do
+    pipe_through :api
+
+    get "/weed/:id", EnlistController, :show
+  end
 end
