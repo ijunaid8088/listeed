@@ -20,12 +20,7 @@ defmodule Listeed.EnlistController do
     IO.inspect hour_datetime
 
     request_from_seaweedfs("#{url_base}/#{hour_datetime}/?limit=3600", "Files", "name")
-    |> Enum.reject(fn(files) -> files == [] end)
-    |> Enum.reject(fn(file_name) -> file_name == "metadata.json" end)
-    |> Enum.each(fn(_file_name) ->
-      Agent.update(agent, fn list -> ["true" | list] end)
-      IO.inspect agent
-    end)
+    |> start_count(agent)
   end
 
   def request_from_seaweedfs(url, type, attribute) do
@@ -37,5 +32,16 @@ defmodule Listeed.EnlistController do
     else
       _ -> []
     end
+  end
+
+  defp start_count([], agent), do: Agent.update(agent, fn list -> ["" | list] end)
+  defp start_count(files, agent) do
+    files
+    |> Enum.reject(fn(files) -> files == [] end)
+    |> Enum.reject(fn(file_name) -> file_name == "metadata.json" end)
+    |> Enum.each(fn(_file_name) ->
+      Agent.update(agent, fn list -> ["true" | list] end)
+      IO.inspect agent
+    end)
   end
 end
