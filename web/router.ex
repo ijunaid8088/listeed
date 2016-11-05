@@ -22,6 +22,6 @@ defmodule Listeed.Router do
   scope "/api", Listeed do
     pipe_through :api
 
-    get "/weed/:id", EnlistController, :show
+    get "/weed/:camera/snapshots/:date/:hour", EnlistController, :show
   end
 end
