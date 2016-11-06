@@ -23,5 +23,7 @@ defmodule Listeed.Router do
     pipe_through :api
 
     get "/weed/:camera/snapshots/:date/:hour", EnlistController, :show
+
+    get "/weed/:camera/yesterday", EnlistController, :yesterday
   end
 end
