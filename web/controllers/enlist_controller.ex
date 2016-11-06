@@ -2,25 +2,45 @@ defmodule Listeed.EnlistController do
   use Listeed.Web, :controller
 
   def show(conn, %{"camera" => camera_exid, "date" => date_unix, "hour" => hour}) do
-    {:ok, agent} = Agent.start_link fn -> [] end
-    hour = hour(camera_exid, date_unix, hour, agent)
-
-    count =
-    Agent.get(agent, fn list -> list end)
-    |> Enum.filter(fn(item) -> item end)
-    |> Enum.count
-
-    render(conn, "show.json", image_count: count)
+    total = hour(camera_exid, date_unix, hour)
+    render(conn, "show.json", image_count: total)
   end
 
-  def hour(camera_exid, date_unix, hour, agent) do
-    url_base = "#{System.get_env["FILER"]}/#{camera_exid}/snapshots/recordings"
-    IO.inspect url_base
-    hour_datetime = date_unix |> Calendar.DateTime.Parse.unix! |> Calendar.Strftime.strftime!("%Y/%m/%d/#{String.rjust("#{hour}", 2, ?0)}")
-    IO.inspect hour_datetime
+  def yesterday(conn, %{"camera" => camera_exid}) do
+    %{day: tday, month: tmonth, year: tyear} = Calendar.Date.today_utc
+    %{day: yday, month: ymonth, year: yyear} = Calendar.Date.from_erl!({tyear, tmonth, tday}) |> Calendar.Date.prev_day!
 
+    date_unix =
+      {{yyear, ymonth, yday}, {0, 0, 0}}
+      |> Calendar.DateTime.from_erl!("Etc/UTC")
+      |> Calendar.DateTime.Format.unix
+
+    data = Enum.map 0..23, fn per_hour ->
+      %{
+          hour:  per_hour,
+          count: hour(camera_exid, date_unix, per_hour)
+       }
+    end
+
+    render(conn, "yesterday.json", %{camera_exid: camera_exid, enlist: data})
+  end
+
+  def do_it_smart([hour, count]) do
+    %{
+      hour: hour,
+      image_count: count
+    }
+  end
+
+  def get_camera_list() do
+    request_from_seaweedfs("#{System.get_env["FILER"]}", "Subdirectories", "Name")
+  end
+
+  def hour(camera_exid, date_unix, hour) do
+    url_base = "#{System.get_env["FILER"]}/#{camera_exid}/snapshots/recordings"
+    hour_datetime = date_unix |> Calendar.DateTime.Parse.unix! |> Calendar.Strftime.strftime!("%Y/%m/%d/#{String.rjust("#{hour}", 2, ?0)}")
     request_from_seaweedfs("#{url_base}/#{hour_datetime}/?limit=3600", "Files", "name")
-    |> start_count(agent)
+    |> start_count
   end
 
   def request_from_seaweedfs(url, type, attribute) do
@@ -34,14 +54,12 @@ defmodule Listeed.EnlistController do
     end
   end
 
-  defp start_count([], agent), do: Agent.update(agent, fn list -> ["" | list] end)
-  defp start_count(files, agent) do
+  defp start_count([]), do: 0
+  defp start_count(files) do
     files
     |> Enum.reject(fn(files) -> files == [] end)
     |> Enum.reject(fn(file_name) -> file_name == "metadata.json" end)
-    |> Enum.each(fn(_file_name) ->
-      Agent.update(agent, fn list -> ["true" | list] end)
-      IO.inspect agent
-    end)
+    |> Enum.filter(fn(item) -> item end)
+    |> Enum.count
   end
 end
